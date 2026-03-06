@@ -25,15 +25,34 @@ router.get('/:id', function (req, res) {
 
 // POST Create User
 router.post('/', function (req, res) {
+    const { username, password, email, fullName, avatarUrl, status, roleId } = req.body;
+
+    // 1. Required fields check
+    if (!username || !password || !email) {
+        return res.status(400).send({ message: "Username, password, and email are required" });
+    }
+
+    // 2. Uniqueness check
+    const existingUser = users.find(u => u.username === username || u.email === email);
+    if (existingUser) {
+        return res.status(400).send({ message: "Username or email already exists" });
+    }
+
+    // 3. Role existence check
+    const roleExists = roles.find(r => r.id == roleId);
+    if (!roleExists) {
+        return res.status(400).send({ message: "Role ID not found" });
+    }
+
     let newObj = {
         id: IncrementalId(users),
-        username: req.body.username,
-        password: req.body.password,
-        email: req.body.email,
-        fullName: req.body.fullName || "",
-        avatarUrl: req.body.avatarUrl || "https://i.sstatic.net/l60Hf.png",
-        status: req.body.status || false,
-        role: req.body.roleId, // Expecting role ID
+        username: username,
+        password: password,
+        email: email,
+        fullName: fullName || "",
+        avatarUrl: avatarUrl || "https://i.sstatic.net/l60Hf.png",
+        status: status || false,
+        role: roleId,
         loginCount: 0,
         isDeleted: false,
         createdAt: new Date(),
@@ -45,15 +64,44 @@ router.post('/', function (req, res) {
 
 // PUT Update User
 router.put('/:id', function (req, res) {
-    let result = users.find(e => e.id == req.params.id && !e.isDeleted);
-    if (result) {
+    let user = users.find(e => e.id == req.params.id && !e.isDeleted);
+    if (user) {
+        const { username, email, roleId, loginCount } = req.body;
+
+        // 1. Uniqueness check for username/email if they are being updated
+        if (username && username !== user.username) {
+            if (users.find(u => u.username === username)) {
+                return res.status(400).send({ message: "Username already exists" });
+            }
+        }
+        if (email && email !== user.email) {
+            if (users.find(u => u.email === email)) {
+                return res.status(400).send({ message: "Email already exists" });
+            }
+        }
+
+        // 2. Role existence check if roleId is being updated
+        if (roleId && roleId !== user.role) {
+            if (!roles.find(r => r.id == roleId)) {
+                return res.status(400).send({ message: "Role ID not found" });
+            }
+        }
+
+        // 3. loginCount check
+        if (loginCount !== undefined && loginCount < 0) {
+            return res.status(400).send({ message: "loginCount cannot be less than 0" });
+        }
+
         let body = req.body;
-        let allowedFields = ['username', 'password', 'email', 'fullName', 'avatarUrl', 'role', 'status'];
+        let allowedFields = ['username', 'password', 'email', 'fullName', 'avatarUrl', 'status', 'loginCount'];
         allowedFields.forEach(field => {
-            if (body[field] !== undefined) result[field] = body[field];
+            if (body[field] !== undefined) user[field] = body[field];
         });
-        result.updatedAt = new Date();
-        res.send(result);
+
+        if (roleId) user.role = roleId;
+
+        user.updatedAt = new Date();
+        res.send(user);
     } else {
         res.status(404).send({ message: "USER NOT FOUND" });
     }

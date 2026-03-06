@@ -21,10 +21,23 @@ router.get('/:id', function (req, res) {
 
 // POST Create Role
 router.post('/', function (req, res) {
+    const { name, description } = req.body;
+
+    // 1. Required field check
+    if (!name) {
+        return res.status(400).send({ message: "Role name is required" });
+    }
+
+    // 2. Uniqueness check
+    const existingRole = roles.find(r => r.name === name);
+    if (existingRole) {
+        return res.status(400).send({ message: "Role name already exists" });
+    }
+
     let newObj = {
         id: IncrementalId(roles),
-        name: req.body.name,
-        description: req.body.description || "",
+        name: name,
+        description: description || "",
         isDeleted: false,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -35,13 +48,22 @@ router.post('/', function (req, res) {
 
 // PUT Update Role
 router.put('/:id', function (req, res) {
-    let result = roles.find(e => e.id == req.params.id && !e.isDeleted);
-    if (result) {
-        let body = req.body;
-        if (body.name) result.name = body.name;
-        if (body.description !== undefined) result.description = body.description;
-        result.updatedAt = new Date();
-        res.send(result);
+    let role = roles.find(e => e.id == req.params.id && !e.isDeleted);
+    if (role) {
+        const { name, description } = req.body;
+
+        // 1. Uniqueness check for name if it's being updated
+        if (name && name !== role.name) {
+            if (roles.find(r => r.name === name)) {
+                return res.status(400).send({ message: "Role name already exists" });
+            }
+        }
+
+        if (name) role.name = name;
+        if (description !== undefined) role.description = description;
+
+        role.updatedAt = new Date();
+        res.send(role);
     } else {
         res.status(404).send({ message: "ROLE NOT FOUND" });
     }
